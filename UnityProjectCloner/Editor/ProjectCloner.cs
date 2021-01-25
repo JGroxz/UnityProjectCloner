@@ -9,6 +9,9 @@ using UnityProjectCloner;
 
 namespace UnityProjectCloner
 {
+    using System;
+    using System.Threading;
+
     /// <summary>
     /// Contains all required methods for creating a linked clone of the Unity project.
     /// </summary>
@@ -130,9 +133,9 @@ namespace UnityProjectCloner
             switch (Application.platform)
             {
                 case (RuntimePlatform.WindowsEditor):
-                    string args = "/c " + @"rmdir /s/q " + string.Format("\"{0}\"", cloneProjectPath);
+                    string args = $"/c rmdir /s/q \"{cloneProjectPath}\"";
                     StartHiddenConsoleProcess("cmd.exe", args);
-                    Debug.Log("Clone deleted");
+                    CheckCloneDeleted();
                     break;
                 case (RuntimePlatform.OSXEditor):
                     throw new System.NotImplementedException("No Mac function implement yet :(");
@@ -144,6 +147,39 @@ namespace UnityProjectCloner
                     Debug.LogWarning("Not in a known editor. Where are you!?");
                     break;
             }
+        }
+        
+        /// <summary>
+        /// Pauses the main thread and checks whether clone folder is still present.
+        /// </summary>
+        /// <remarks>
+        /// This is used to check if clone deletion was successful. 
+        /// </remarks>
+        private static void CheckCloneDeleted()
+        {
+            EditorUtility.DisplayProgressBar(
+                "Deleting clone...",
+                $"Deleting clone project '{GetCloneProjectPath()}'...",
+                0f
+            );
+            
+            // Pause the thread to let the deletion process finish.
+            // 1 second should be enough, as clone project folder has only symlinks.
+            const int delay = 1000;
+            Thread.Sleep(delay);
+            
+            // Check if the clone folder is gone.
+            bool deleted = GetCloneProjectPath() == string.Empty;
+            if (deleted)
+            {
+                Debug.Log("Clone deleted.");
+            }
+            else
+            {
+                Debug.LogError("Failed to delete clone. Ths can happen if the clone is currently open in another Unity Editor session.");
+            }
+            
+            EditorUtility.ClearProgressBar();
         }
         #endregion
 
@@ -441,12 +477,18 @@ namespace UnityProjectCloner
         /// </summary>
         /// <param name="fileName"></param>
         /// <param name="args"></param>
+        /// <returns></returns>
         private static void StartHiddenConsoleProcess(string fileName, string args)
         {
-            var process = new System.Diagnostics.Process();
-            process.StartInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
-            process.StartInfo.FileName = fileName;
-            process.StartInfo.Arguments = args;
+            var process = new System.Diagnostics.Process
+            {
+                StartInfo =
+                {
+                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden, 
+                    FileName = fileName, 
+                    Arguments = args
+                }
+            };
 
             process.Start();
         }
