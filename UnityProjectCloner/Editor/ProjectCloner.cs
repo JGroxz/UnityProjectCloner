@@ -10,6 +10,7 @@ using UnityProjectCloner;
 namespace UnityProjectCloner
 {
     using System;
+    using System.Security.Cryptography;
     using System.Threading;
 
     /// <summary>
@@ -65,7 +66,7 @@ namespace UnityProjectCloner
 
             ProjectCloner.CreateProjectFolder(cloneProject);
             ProjectCloner.CopyLibraryFolder(sourceProject, cloneProject);
-
+            
             ProjectCloner.LinkFolders(sourceProject.assetPath, cloneProject.assetPath);
             ProjectCloner.LinkFolders(sourceProject.projectSettingsPath, cloneProject.projectSettingsPath);
             ProjectCloner.LinkFolders(sourceProject.packagesPath, cloneProject.packagesPath);
@@ -157,19 +158,34 @@ namespace UnityProjectCloner
         /// </remarks>
         private static void CheckCloneDeleted()
         {
-            EditorUtility.DisplayProgressBar(
-                "Deleting clone...",
-                $"Deleting clone project '{GetCloneProjectPath()}'...",
-                0f
-            );
             
             // Pause the thread to let the deletion process finish.
-            // 1 second should be enough, as clone project folder has only symlinks.
-            const int delay = 1000;
-            Thread.Sleep(delay);
+            // 5 seconds should be enough, as clone project folder has only symlinks except the Library folder.
+            const float delay = 5f;
+            const float interval = 0.1f;
+            float timer = delay;
+            bool deleted = false;
             
-            // Check if the clone folder is gone.
-            bool deleted = GetCloneProjectPath() == string.Empty;
+            while (timer > 0f)
+            {
+                // Check if the clone folder is gone.
+                deleted = GetCloneProjectPath() == string.Empty;
+                if (deleted) break;
+                
+                // Update progress bar.
+                float progress = 1f - (timer / delay);
+                EditorUtility.DisplayProgressBar(
+                    "Deleting clone...",
+                    $"Deleting clone project '{GetCloneProjectPath()}'...",
+                    progress
+                );
+                
+                // Wait.
+                Thread.Sleep((int)(interval*1000f));
+                timer -= interval;
+            }
+            
+            // Print message to console.
             if (deleted)
             {
                 Debug.Log("Clone deleted.");
@@ -178,6 +194,7 @@ namespace UnityProjectCloner
             {
                 Debug.LogError("Failed to delete clone. Ths can happen if the clone is currently open in another Unity Editor session.");
             }
+            
             
             EditorUtility.ClearProgressBar();
         }
@@ -198,18 +215,22 @@ namespace UnityProjectCloner
         /// <summary>
         /// Copies the full contents of the unity library. We want to do this to avoid the lengthy reserialization of the whole project when it opens up the clone.
         /// </summary>
+        /// <remarks>
+        /// Excludes PackageCache directory, as it can cause long path exceptions on Windows if packages with long names are present.
+        /// </remarks>
         /// <param name="sourceProject"></param>
         /// <param name="destinationProject"></param>
         public static void CopyLibraryFolder(Project sourceProject, Project destinationProject)
         {
             if (Directory.Exists(destinationProject.libraryPath))
             {
-                Debug.LogWarning("Library copy: destination path already exists! ");
+                Debug.LogWarning("Will not copy Library folder: destination path already exists.");
                 return;
             }
 
-            Debug.Log($"Library copy: {destinationProject.libraryPath}");
+            Debug.Log($"Copying Library folder '{destinationProject.libraryPath}'...");
             ProjectCloner.CopyDirectoryWithProgressBar(sourceProject.libraryPath, destinationProject.libraryPath, $"Cloning project '{sourceProject.name}'. ");
+            Debug.Log("Copied Library folder.");
         }
         #endregion
 
@@ -394,7 +415,7 @@ namespace UnityProjectCloner
         /// <param name="totalBytes">Total bytes to be copied. Calculated automatically, initialize at 0.</param>
         /// <param name="copiedBytes">To track already copied bytes. Calculated automatically, initialize at 0.</param>
         /// <param name="progressBarPrefix">Optional string added to the beginning of the progress bar window header.</param>
-        private static void CopyDirectoryWithProgressBarRecursive(DirectoryInfo source, DirectoryInfo destination, ref long totalBytes, ref long copiedBytes, string progressBarPrefix = "")
+        private static void CopyDirectoryWithProgressBarRecursive(DirectoryInfo source, DirectoryInfo destination, ref long totalBytes, ref long copiedBytes, string progressBarPrefix)
         {
             // Directory cannot be copied into itself.
             if (source.FullName.ToLower() == destination.FullName.ToLower())
@@ -418,9 +439,14 @@ namespace UnityProjectCloner
             // Copy all files from the source.
             foreach (FileInfo file in source.GetFiles())
             {
+                var currentFile = file;
+                // Fix which allows to exceed MAX_PATH when working with files in Windows.
+                // Without it, files with full path longer than 259 characters will throw a FileNotFoundException.
+                if (Application.platform == RuntimePlatform.WindowsEditor) currentFile = new FileInfo($"\\\\?\\{file.FullName}");
+                
                 try
                 {
-                    file.CopyTo(Path.Combine(destination.ToString(), file.Name), true);
+                    currentFile.CopyTo(Path.Combine(destination.ToString(), currentFile.Name), true);
                 }
                 catch (IOException)
                 {
@@ -429,13 +455,13 @@ namespace UnityProjectCloner
                 }
 
                 // Account the copied file size.
-                copiedBytes += file.Length;
+                copiedBytes += currentFile.Length;
 
                 // Display the progress bar.
                 float progress = (float)copiedBytes / (float)totalBytes;
                 bool cancelCopy = EditorUtility.DisplayCancelableProgressBar(
                     $"{progressBarPrefix}Copying '{source.FullName}' to '{destination.FullName}'...",
-                    $"({(progress * 100f):F2}%) Copying file '{file.Name}'...",
+                    $"[{(progress * 100f):F2}%] Copying file '{currentFile.Name}'...",
                     progress);
                 if (cancelCopy) return;
             }
@@ -460,7 +486,15 @@ namespace UnityProjectCloner
             EditorUtility.DisplayProgressBar($"{progressBarPrefix}Calculating size of directories...", $"Scanning '{directory.FullName}'...", 0f);
 
             // Calculate size of all files in directory.
-            long filesSize = directory.EnumerateFiles().Sum((FileInfo file) => file.Length);
+            var enumeratedFiles = directory.EnumerateFiles();
+            long filesSize = enumeratedFiles.Sum((FileInfo file) =>
+            {
+                // Fix which allows to exceed MAX_PATH when working with files in Windows.
+                // Without it, files with full path longer than 259 characters will throw a FileNotFoundException.
+                if (Application.platform == RuntimePlatform.WindowsEditor) file = new FileInfo($"\\\\?\\{file.FullName}");
+                
+                return file.Length;
+            });
 
             // Calculate size of all nested directories.
             long directoriesSize = 0;
