@@ -9,6 +9,9 @@ using UnityProjectCloner;
 
 namespace UnityProjectCloner
 {
+    using System;
+    using System.Threading;
+
     /// <summary>
     /// Contains all required methods for creating a linked clone of the Unity project.
     /// </summary>
@@ -124,28 +127,59 @@ namespace UnityProjectCloner
             ///Extra precautions.
             if (cloneProjectPath == string.Empty) return;
             if (cloneProjectPath == ProjectCloner.GetOriginalProjectPath()) return;
-            if (cloneProjectPath.EndsWith(ProjectCloner.CloneNameSuffix)) return;
+            if (!cloneProjectPath.EndsWith(ProjectCloner.CloneNameSuffix)) return;
 
-            /// Delete the clone project folder.
-            throw new System.NotImplementedException();
-            // TODO: implement proper project deletion;
-            //       appears that using FileUtil.DeleteFileOrDirectory(...) on symlinks affects the contents of linked folders
-            //       (because this script self-deleted itself and half of the Assets folder when I tested it :D)
-            //       there must be another, safe method to delete the clone folder and symlinks without touching the original
+            //Check what OS is
+            switch (Application.platform)
             {
-                /*
-                EditorUtility.DisplayProgressBar("Deleting clone...", "Deleting '" + ProjectCloner.GetCloneProjectPath() + "'", 0f);
-                try
-                {
-                     FileUtil.DeleteFileOrDirectory(cloneProjectPath);
-                }
-                catch (IOException)
-                {
-                     EditorUtility.DisplayDialog("Could not delete clone", "'" + ProjectCloner.GetCurrentProject().name + "_clone' may be currently open in another unity Editor. Please close it and try again.", "OK");
-                }
-                EditorUtility.ClearProgressBar();
-                */
+                case (RuntimePlatform.WindowsEditor):
+                    string args = $"/c rmdir /s/q \"{cloneProjectPath}\"";
+                    StartHiddenConsoleProcess("cmd.exe", args);
+                    CheckCloneDeleted();
+                    break;
+                case (RuntimePlatform.OSXEditor):
+                    throw new System.NotImplementedException("No Mac function implement yet :(");
+                    break;
+                case (RuntimePlatform.LinuxEditor):
+                    throw new System.NotImplementedException("No linux support yet :(");
+                    break;
+                default:
+                    Debug.LogWarning("Not in a known editor. Where are you!?");
+                    break;
             }
+        }
+        
+        /// <summary>
+        /// Pauses the main thread and checks whether clone folder is still present.
+        /// </summary>
+        /// <remarks>
+        /// This is used to check if clone deletion was successful. 
+        /// </remarks>
+        private static void CheckCloneDeleted()
+        {
+            EditorUtility.DisplayProgressBar(
+                "Deleting clone...",
+                $"Deleting clone project '{GetCloneProjectPath()}'...",
+                0f
+            );
+            
+            // Pause the thread to let the deletion process finish.
+            // 1 second should be enough, as clone project folder has only symlinks.
+            const int delay = 1000;
+            Thread.Sleep(delay);
+            
+            // Check if the clone folder is gone.
+            bool deleted = GetCloneProjectPath() == string.Empty;
+            if (deleted)
+            {
+                Debug.Log("Clone deleted.");
+            }
+            else
+            {
+                Debug.LogError("Failed to delete clone. Ths can happen if the clone is currently open in another Unity Editor session.");
+            }
+            
+            EditorUtility.ClearProgressBar();
         }
         #endregion
 
@@ -443,12 +477,18 @@ namespace UnityProjectCloner
         /// </summary>
         /// <param name="fileName"></param>
         /// <param name="args"></param>
+        /// <returns></returns>
         private static void StartHiddenConsoleProcess(string fileName, string args)
         {
-            var process = new System.Diagnostics.Process();
-            process.StartInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
-            process.StartInfo.FileName = fileName;
-            process.StartInfo.Arguments = args;
+            var process = new System.Diagnostics.Process
+            {
+                StartInfo =
+                {
+                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden, 
+                    FileName = fileName, 
+                    Arguments = args
+                }
+            };
 
             process.Start();
         }

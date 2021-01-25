@@ -83,8 +83,6 @@ namespace UnityProjectCloner
                             "Cancel");
                         if (delete)
                         {
-                            // TODO: implement proper project deletion
-                            throw new System.NotImplementedException();
                             ProjectCloner.DeleteClone();
                         }
                     }
