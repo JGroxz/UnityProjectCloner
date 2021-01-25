@@ -51,7 +51,7 @@ namespace UnityProjectCloner
                 {
                     // If original project is present, display some usage info.
                     EditorGUILayout.HelpBox(
-                        $"This project is a clone of the project '{Path.GetFileName(originalProjectPath)}'.\nIf you want to make changes the project files or manage clones, please open the original project through Unity Hub.", 
+                        $"This project is a clone of the project '{Path.GetFileName(originalProjectPath)}'.\nIf you want to make changes to the project files or manage clones, please open the original project through Unity Hub.", 
                         MessageType.Info);
                 }
             }
