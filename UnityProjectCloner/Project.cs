@@ -22,10 +22,7 @@ namespace UnityProjectCloner
 		/// <summary>
 		/// Default constructor
 		/// </summary>
-		public Project()
-		{
-
-		}
+		public Project() {}
 
 
 		/// <summary>
@@ -62,11 +59,11 @@ namespace UnityProjectCloner
 		/// <summary>
 		/// Update the project object by renaming and reparsing it. Pass in the new name of a project, and it'll update the other member variables to match.
 		/// </summary>
-		/// <param name="name"></param>
-		public void updateNewName(string newName)
+		/// <param name="newName"></param>
+		public void UpdateProjectName(string newName)
 		{
 			name = newName;
-			ParsePath(rootPath + "/" + name + "/Assets");
+			ParsePath($"{rootPath}/{name}/Assets");
 		}
 
 
@@ -89,21 +86,21 @@ namespace UnityProjectCloner
 
 		private void ParsePath(string path)
 		{
-			//Unity's Application functions return the Assets path in the Editor. 
+			// Unity's Application functions return the Assets path in the Editor. 
 			projectPath = path;
 
-			//pop off the last part of the path for the project name, keep the rest for the root path
-			List<string> pathArray = projectPath.Split(separator).ToList<string>();
+			// pop off the last part of the path for the project name, keep the rest for the root path
+			var pathArray = projectPath.Split(separator).ToList<string>();
 			name = pathArray.Last();
 
-			pathArray.RemoveAt(pathArray.Count() - 1);
+			pathArray.RemoveAt(pathArray.Count - 1);
 			rootPath = string.Join(separator[0].ToString(), pathArray);
 
-			assetPath = projectPath + "/Assets";
-			projectSettingsPath = projectPath + "/ProjectSettings";
-			libraryPath = projectPath + "/Library";
-			packagesPath = projectPath + "/Packages";
-			autoBuildPath = projectPath + "/AutoBuild";
+			assetPath = $"{projectPath}/Assets";
+			projectSettingsPath = $"{projectPath}/ProjectSettings";
+			libraryPath = $"{projectPath}/Library";
+			packagesPath = $"{projectPath}/Packages";
+			autoBuildPath = $"{projectPath}/AutoBuild";
 
 		}
 	}

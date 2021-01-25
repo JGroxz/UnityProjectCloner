@@ -60,8 +60,8 @@ namespace UnityProjectCloner
             Project sourceProject = new Project(sourceProjectPath);
             Project cloneProject = new Project(sourceProjectPath + ProjectCloner.CloneNameSuffix);
 
-            Debug.Log("Start project name: " + sourceProject);
-            Debug.Log("Clone project name: " + cloneProject);
+            Debug.Log($"Original project name: {sourceProject}");
+            Debug.Log($"Clone project name: {cloneProject}");
 
             ProjectCloner.CreateProjectFolder(cloneProject);
             ProjectCloner.CopyLibraryFolder(sourceProject, cloneProject);
@@ -82,13 +82,13 @@ namespace UnityProjectCloner
         /// <param name="cloneProject"></param>
         private static void RegisterClone(Project cloneProject)
         {
-            /// Add clone identifier file.
+            // Add clone identifier file.
             string identifierFile = Path.Combine(cloneProject.projectPath, ProjectCloner.CloneFileName);
             File.Create(identifierFile).Dispose();
 
-            /// Add collabignore.txt to stop the clone from messing with Unity Collaborate if it's enabled. Just in case.
+            // Add collabignore.txt to stop the clone from messing with Unity Collaborate if it's enabled. Just in case.
             string collabignoreFile = Path.Combine(cloneProject.projectPath, "collabignore.txt");
-            File.WriteAllText(collabignoreFile, "*"); /// Make it ignore ALL files in the clone.
+            File.WriteAllText(collabignoreFile, "*"); // <- make it ignore ALL files in the clone
         }
 
         /// <summary>
@@ -99,7 +99,7 @@ namespace UnityProjectCloner
         {
             if (!Directory.Exists(projectPath))
             {
-                Debug.LogError("Cannot open the project - provided folder (" + projectPath + ") does not exist.");
+                Debug.LogError($"Cannot open the project - provided folder ({projectPath}) does not exist.");
                 return;
             }
             if (projectPath == ProjectCloner.GetCurrentProjectPath())
@@ -109,8 +109,8 @@ namespace UnityProjectCloner
             }
 
             string fileName = EditorApplication.applicationPath;
-            string args = "-projectPath \"" + projectPath + "\"";
-            Debug.Log("Opening project \"" + fileName + " " + args + "\"");
+            string args = $"-projectPath \"{projectPath}\"";
+            Debug.Log($"Opening project \"{fileName} {args}\"");
             ProjectCloner.StartHiddenConsoleProcess(fileName, args);
         }
 
@@ -119,12 +119,12 @@ namespace UnityProjectCloner
         /// </summary>
         public static void DeleteClone()
         {
-            /// Clone won't be able to delete itself.
+            // Clone won't be able to delete itself.
             if (ProjectCloner.IsClone()) return;
 
             string cloneProjectPath = ProjectCloner.GetCloneProjectPath();
 
-            ///Extra precautions.
+            // Extra precautions.
             if (cloneProjectPath == string.Empty) return;
             if (cloneProjectPath == ProjectCloner.GetOriginalProjectPath()) return;
             if (!cloneProjectPath.EndsWith(ProjectCloner.CloneNameSuffix)) return;
@@ -191,7 +191,7 @@ namespace UnityProjectCloner
         public static void CreateProjectFolder(Project project)
         {
             string path = project.projectPath;
-            Debug.Log("Creating new empty folder at: " + path);
+            Debug.Log($"Creating new empty folder at: {path}");
             Directory.CreateDirectory(path);
         }
 
@@ -208,8 +208,8 @@ namespace UnityProjectCloner
                 return;
             }
 
-            Debug.Log("Library copy: " + destinationProject.libraryPath);
-            ProjectCloner.CopyDirectoryWithProgressBar(sourceProject.libraryPath, destinationProject.libraryPath, "Cloning project '" + sourceProject.name + "'. ");
+            Debug.Log($"Library copy: {destinationProject.libraryPath}");
+            ProjectCloner.CopyDirectoryWithProgressBar(sourceProject.libraryPath, destinationProject.libraryPath, $"Cloning project '{sourceProject.name}'. ");
         }
         #endregion
 
@@ -223,7 +223,7 @@ namespace UnityProjectCloner
         {
             Debug.LogWarning("This hasn't been tested yet! I am mac-less :( Please chime in on the github if it works for you.");
 
-            string cmd = "ln " + string.Format("\"{0}\" \"{1}\"", destinationPath, sourcePath);
+            string cmd = $"ln \"{destinationPath}\" \"{sourcePath}\"";
             Debug.Log("Mac hard link " + cmd);
 
             ProjectCloner.StartHiddenConsoleProcess("/bin/bash", cmd);
@@ -236,8 +236,8 @@ namespace UnityProjectCloner
         /// <param name="destinationPath"></param>
         private static void CreateLinkWin(string sourcePath, string destinationPath)
         {
-            string cmd = "/C mklink /J " + string.Format("\"{0}\" \"{1}\"", destinationPath, sourcePath);
-            Debug.Log("Windows junction: " + cmd);
+            string cmd = $"/C mklink /J \"{destinationPath}\" \"{sourcePath}\"";
+            Debug.Log($"Windows junction: {cmd}");
             ProjectCloner.StartHiddenConsoleProcess("cmd.exe", cmd);
         }
 
@@ -256,7 +256,7 @@ namespace UnityProjectCloner
         /// <param name="destinationPath"></param>
         public static void LinkFolders(string sourcePath, string destinationPath)
         {
-            if ((Directory.Exists(destinationPath) == false) && (Directory.Exists(sourcePath) == true))
+            if (!Directory.Exists(destinationPath) && Directory.Exists(sourcePath))
             {
                 switch (Application.platform)
                 {
@@ -274,9 +274,13 @@ namespace UnityProjectCloner
                         break;
                 }
             }
+            else if (!Directory.Exists(sourcePath))
+            {
+                Debug.LogWarning($"Cannot create Asset link, because the specified source folder ('{destinationPath}') does not exist.");
+            }
             else
             {
-                Debug.LogWarning("Skipping Asset link, it already exists: " + destinationPath);
+                Debug.LogWarning($"Skipping Asset link, it already exists: '{destinationPath}'.");
             }
         }
         #endregion
@@ -288,7 +292,7 @@ namespace UnityProjectCloner
         /// <returns></returns>
         public static bool IsClone()
         {
-            /// The project is a clone if its root directory contains an empty file named ".clone".
+            // The project is a clone if its root directory contains an empty file named ".clone".
             string cloneFilePath = Path.Combine(ProjectCloner.GetCurrentProjectPath(), ProjectCloner.CloneFileName);
             bool isClone = File.Exists(cloneFilePath);
             return isClone;
@@ -323,8 +327,8 @@ namespace UnityProjectCloner
         {
             if (IsClone())
             {
-                /// If this is a clone...
-                /// Original project path can be deduced by removing the suffix from the clone's path.
+                // If this is a clone...
+                // Original project path can be deduced by removing the suffix from the clone's path.
                 string cloneProjectPath = ProjectCloner.GetCurrentProject().projectPath;
                 string originalProjectPath = cloneProjectPath.Remove(cloneProjectPath.Length - ProjectCloner.CloneNameSuffix.Length);
 
@@ -333,7 +337,7 @@ namespace UnityProjectCloner
             }
             else
             {
-                /// If this is the original, we return its own path.
+                // If this is the original, we return its own path.
                 return ProjectCloner.GetCurrentProjectPath();
             }
         }
@@ -348,13 +352,13 @@ namespace UnityProjectCloner
         {
             if (IsClone())
             {
-                /// If this is the clone, we return its own path.
+                // If this is the clone, we return its own path.
                 return ProjectCloner.GetCurrentProjectPath();
             }
             else
             {
-                /// If this is the original...
-                /// Clone project path can be deduced by add the suffix to the original's path.
+                // If this is the original...
+                // Clone project path can be deduced by add the suffix to the original's path.
                 string originalProjectPath = ProjectCloner.GetCurrentProject().projectPath;
                 string cloneProjectPath = originalProjectPath + ProjectCloner.CloneNameSuffix;
 
@@ -392,26 +396,26 @@ namespace UnityProjectCloner
         /// <param name="progressBarPrefix">Optional string added to the beginning of the progress bar window header.</param>
         private static void CopyDirectoryWithProgressBarRecursive(DirectoryInfo source, DirectoryInfo destination, ref long totalBytes, ref long copiedBytes, string progressBarPrefix = "")
         {
-            /// Directory cannot be copied into itself.
+            // Directory cannot be copied into itself.
             if (source.FullName.ToLower() == destination.FullName.ToLower())
             {
                 Debug.LogError("Cannot copy directory into itself.");
                 return;
             }
 
-            /// Calculate total bytes, if required.
+            // Calculate total bytes, if required.
             if (totalBytes == 0)
             {
                 totalBytes = ProjectCloner.GetDirectorySize(source, true, progressBarPrefix);
             }
 
-            /// Create destination directory, if required.
+            // Create destination directory, if required.
             if (!Directory.Exists(destination.FullName))
             {
                 Directory.CreateDirectory(destination.FullName);
             }
 
-            /// Copy all files from the source.
+            // Copy all files from the source.
             foreach (FileInfo file in source.GetFiles())
             {
                 try
@@ -420,23 +424,23 @@ namespace UnityProjectCloner
                 }
                 catch (IOException)
                 {
-                    /// Some files may throw IOException if they are currently open in Unity editor.
-                    /// Just ignore them in such case.
+                    // Some files may throw IOException if they are currently open in Unity editor.
+                    // Just ignore them in such case.
                 }
 
-                /// Account the copied file size.
+                // Account the copied file size.
                 copiedBytes += file.Length;
 
-                /// Display the progress bar.
+                // Display the progress bar.
                 float progress = (float)copiedBytes / (float)totalBytes;
                 bool cancelCopy = EditorUtility.DisplayCancelableProgressBar(
-                    progressBarPrefix + "Copying '" + source.FullName + "' to '" + destination.FullName + "'...",
-                    "(" + (progress * 100f).ToString("F2") + "%) Copying file '" + file.Name + "'...",
+                    $"{progressBarPrefix}Copying '{source.FullName}' to '{destination.FullName}'...",
+                    $"({(progress * 100f):F2}%) Copying file '{file.Name}'...",
                     progress);
                 if (cancelCopy) return;
             }
 
-            /// Copy all nested directories from the source.
+            // Copy all nested directories from the source.
             foreach (DirectoryInfo sourceNestedDir in source.GetDirectories())
             {
                 DirectoryInfo nextDestingationNestedDir = destination.CreateSubdirectory(sourceNestedDir.Name);
@@ -453,12 +457,12 @@ namespace UnityProjectCloner
         /// <returns>Size of the directory in bytes.</returns>
         private static long GetDirectorySize(DirectoryInfo directory, bool includeNested = false, string progressBarPrefix = "")
         {
-            EditorUtility.DisplayProgressBar(progressBarPrefix + "Calculating size of directories...", "Scanning '" + directory.FullName + "'...", 0f);
+            EditorUtility.DisplayProgressBar($"{progressBarPrefix}Calculating size of directories...", $"Scanning '{directory.FullName}'...", 0f);
 
-            /// Calculate size of all files in directory.
+            // Calculate size of all files in directory.
             long filesSize = directory.EnumerateFiles().Sum((FileInfo file) => file.Length);
 
-            /// Calculate size of all nested directories.
+            // Calculate size of all nested directories.
             long directoriesSize = 0;
             if (includeNested)
             {
